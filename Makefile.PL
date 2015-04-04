@@ -15,7 +15,7 @@ WriteMakefile(
     resources => {
       license    => 'http://www.opensource.org/licenses/artistic-license-2.0',
       bugtracker => 'https://github.com/kwakwaversal/mojolicious-plugin-restify/issues',
-      repository => 'https://github.com/kwakwaversal/Mojolicious-Plugin-Restify.git',
+      repository => 'https://github.com/kwakwaversal/mojolicious-plugin-restify.git',
     },
     no_index => {directory => ['t']}
   },
