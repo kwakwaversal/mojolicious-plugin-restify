@@ -105,8 +105,8 @@ conditions](https://metacpan.org/pod/Mojolicious::Routes#conditions).
   my $route = $r->collection('accounts', over => 'uuid');
 ```
 
-[Mojolicious::Plugin::Restify](https://metacpan.org/release/Mojolicious-Plugin-
-Restify) tries not to make too many assumptions, but the author's recent
-experience writing a REST-based API using
+[Mojolicious::Plugin::Restify](https://metacpan.org/release/Mojolicious-Plugin-Restify)
+tries not to make too many assumptions, but the author's recent experience
+writing a REST-based API using
 [Mojolicious](https://metacpan.org/release/Mojolicious) has helped shaped this
 plugin, and might unwittingly express some of his bias.
