@@ -75,9 +75,9 @@ Route shortcuts & helpers for REST collections for the
 ```
 
 [Mojolicious::Plugin::Restify](https://metacpan.org/release/Mojolicious-Plugin-Restify)
-is a [Mojolicious::Plugin](https://metacpan.org/pod/Mojolicious-Plugin). It
+is a [Mojolicious::Plugin](https://metacpan.org/pod/Mojolicious::Plugin). It
 simplifies generating all of the
-[Mojolicious::Routes](https://metacpan.org/pod/Mojolicious-Routes) for a
+[Mojolicious::Routes](https://metacpan.org/pod/Mojolicious::Routes) for a
 typical REST *collection* endpoint (e.g., `/accounts` or `/invoices>` and maps
 the common HTTP verbs (`DELETE`, `GET`, `PATCH`, `POST`, `PUT>` to underlying
 controller class methods.
@@ -85,7 +85,7 @@ controller class methods.
 For example, creating a *collection* called `/accounts` would create the routes
 as shown below. N.B. The `over` option in the example below corresponds to the
 name of a route condition. See [Mojolicious route
-conditions](https://metacpan.org/pod/Mojolicious-Routes#conditions).
+conditions](https://metacpan.org/pod/Mojolicious::Routes#conditions).
 
 ```perl
   # The collection route shortcut below creates the following routes, and maps
