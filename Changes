@@ -1,5 +1,8 @@
 -----------------------------------------------------
 
+0.02  2015-05-28
+  - Rebuilding distribution. Version 0.01 was broken (oops).
+
 0.01  2015-05-28
   - Adding .travis.yml.
   - Production ready version of Mojolicious::Plugin::Restify.
