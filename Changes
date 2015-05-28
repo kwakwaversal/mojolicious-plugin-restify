@@ -1,4 +1,5 @@
 -----------------------------------------------------
 
 0.01  2015-05-28
+  - Adding .travis.yml.
   - Production ready version of Mojolicious::Plugin::Restify.
