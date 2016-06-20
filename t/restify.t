@@ -7,17 +7,17 @@ sub catchall {
   $self->render(text => "$msg,$id");
 }
 
-sub under { 1 }
+sub under  {1}
 sub create { shift->catchall('create') }
 sub delete { shift->catchall('delete') }
-sub list   { shift->catchall('list')   }
-sub read   { shift->catchall('read')   }
+sub list   { shift->catchall('list') }
+sub read   { shift->catchall('read') }
 sub update { shift->catchall('update') }
 
 sub name {
   my $self = shift;
   my $name = $self->stash->{controller};
-  $name =~ s,^.*?\-,,;
+  $name =~ s,^.*\-,,;
   return $name;
 }
 
@@ -36,8 +36,28 @@ sub users {
 
 1;
 
-package My::Mojo::App::Invoices;
+package My::Mojo::App::Attach;
+use Mojo::Base 'Mojolicious::Controller';
+
+sub authenticate {1}
+
+1;
+
+package My::Mojo::App::Attach::GlobalUsers;
 use Mojo::Base 'My::Mojo::App::Base';
+
+1;
+
+package My::Mojo::App::Attach::GlobalUsers::Roles;
+use Mojo::Base 'My::Mojo::App::Base';
+
+sub read {
+  my $self = shift;
+  $self->render(
+    text => join ",",
+    'read', $self->stash('global_users_id'), $self->stash('roles_id')
+  );
+}
 
 1;
 
@@ -47,6 +67,11 @@ use Mojo::Base 'My::Mojo::App::Base';
 1;
 
 package My::Mojo::App::FooBar::BarBar;
+use Mojo::Base 'My::Mojo::App::Base';
+
+1;
+
+package My::Mojo::App::Invoices;
 use Mojo::Base 'My::Mojo::App::Base';
 
 1;
@@ -89,7 +114,7 @@ sub startup {
   $self->secrets(["sssshhhhhh!"]);
 
   # Load the plugin
-  $self->plugin('Mojolicious::Plugin::Restify', { over => 'int' });
+  $self->plugin('Mojolicious::Plugin::Restify', {over => 'int'});
 
   # Router
   my $r = $self->routes;
@@ -97,19 +122,22 @@ sub startup {
 
   # REST routes config
   my $rest_routes = {
-    'foo-bar'  => {
-      'bar-bar' => undef,
-    },
+    'foo-bar'  => {'bar-bar' => undef},
     'invoices' => undef,
     'messages' => [undef, {over => 'uuid'}],
-    'users'    => {
-      'roles'    => undef,
-      'messages' => undef,
-    },
+    'users' => {'roles' => undef, 'messages' => undef},
   };
 
   # Test the restify helper
   $self->restify->routes($r, $rest_routes);
+
+  # Attach nested routes to an existing route
+  my $attach = $r->any('/attach')->under->to('attach#authenticate');
+  $self->restify->routes(
+    $attach,
+    {'global-users' => {'roles' => undef}},
+    {controller     => 'attach'}
+  );
 
   # Collection test for specific options
   $r->collection('withoutunder', under => 0);
@@ -124,6 +152,15 @@ use Test::More;
 use Test::Mojo;
 
 my $t = Test::Mojo->new('Test::Mojolicious::Plugin::Restify');
+
+# /attach/users/*
+$t->get_ok('/attach/global-users')->status_is(200)->content_is('list,');
+$t->get_ok('/attach/global-users/1')->status_is(200)->content_is('read,1');
+$t->get_ok('/attach/global-users/1/roles')->status_is(200)->content_is('list,');
+$t->get_ok('/attach/global-users/100/roles/500')->status_is(200)
+  ->content_is('read,100,500');
+$t->get_ok('/attach/global-users/0')->status_is(200)->content_is('read,0');
+$t->get_ok('/attach/global-users/-1')->status_is(404);
 
 # /foo-bar
 $t->get_ok('/foo-bar')->status_is(200)->content_is('list,');
