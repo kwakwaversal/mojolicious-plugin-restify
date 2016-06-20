@@ -157,7 +157,9 @@ sub register {
           my $collection = $r->collection($name, {%$options, element => 0});
           my $under
             = $options->{under}
-            ? $collection->under->to("$controller#under")
+            ? $collection->under->to($options->{controller}
+            ? "$options->{controller}-$controller#under"
+            : "$controller#under")
             : $collection;
           my $endpoint = $under->element($name, {%$options, under => 0});
           $options->{controller}
@@ -510,9 +512,19 @@ need to call this shortcut directly.
 When an element is added to a I<collection>'s route, the resource ID is captured
 using a standard placeholder.
 
+=head1 CREDITS
+
+In alphabetical order:
+
+=over 2
+
+Dragoș-Robert Neagu
+
+=back
+
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2015, Paul Williams.
+Copyright (C) 2015-2016, Paul Williams.
 
 This program is free software, you can redistribute it and/or modify it under
 the terms of the Artistic License version 2.0.

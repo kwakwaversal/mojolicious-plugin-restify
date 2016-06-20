@@ -1,5 +1,10 @@
 -----------------------------------------------------
 
+0.03  2016-06-20
+  - Testing against 5.22.
+  - Fixed bug when adding nested routes not honouring initial 'controller'
+    namespace. (Thanks Dragoș.)
+
 0.02  2015-05-28
   - Rebuilding distribution. Version 0.01 was broken (oops).
 
