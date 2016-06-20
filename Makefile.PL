@@ -5,7 +5,7 @@ use warnings;
 
 use ExtUtils::MakeMaker;
 
-# Mojolicious 5.27 first introduced support for nested helper
+# Mojolicious 5.27 first introduced support for nested helpers
 WriteMakefile(
   NAME         => 'Mojolicious::Plugin::Restify',
   VERSION_FROM => 'lib/Mojolicious/Plugin/Restify.pm',
