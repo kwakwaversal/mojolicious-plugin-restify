@@ -106,7 +106,49 @@ sub resource_lookup { shift->reply->not_found }
 
 1;
 
-package Test::Mojolicious::Plugin::Restify;
+package Test::Mojolicious::Plugin::Restify::ArrayRef;
+use Mojo::Base 'Mojolicious';
+
+sub startup {
+  my $self = shift;
+  $self->secrets(["sssshhhhhh!"]);
+
+  # Load the plugin
+  $self->plugin('Mojolicious::Plugin::Restify', {over => 'int'});
+
+  # Router
+  my $r = $self->routes;
+  $r->namespaces(['My::Mojo::App']);
+
+  # REST routes config
+  my $rest_routes = [
+    'foo-bar',
+    'foo-bar/bar-bar',
+    'invoices',
+    ['messages' => {over => 'uuid'}],
+    'users',
+    'users/roles',
+    'users/roles/messages'
+  ];
+
+  # Test the restify helper
+  $self->restify->routes($r, $rest_routes);
+
+  # Attach nested routes to an existing route
+  my $attach = $r->any('/attach')->under->to('attach#authenticate');
+  $self->restify->routes(
+    $attach,
+    {'global-users' => {'roles' => undef}},
+    {controller     => 'attach'}
+  );
+
+  # Collection test for specific options
+  $r->collection('withoutlookup', resource_lookup => 0);
+}
+
+1;
+
+package Test::Mojolicious::Plugin::Restify::HashRef;
 use Mojo::Base 'Mojolicious';
 
 sub startup {
@@ -122,10 +164,15 @@ sub startup {
 
   # REST routes config
   my $rest_routes = {
-    'foo-bar'  => {'bar-bar' => undef},
+    'foo-bar'  => {
+        'bar-bar' => undef
+    },
     'invoices' => undef,
     'messages' => [undef, {over => 'uuid'}],
-    'users' => {'roles' => undef, 'messages' => undef},
+    'users' => {
+        'roles' => undef,
+        'messages' => undef
+    },
   };
 
   # Test the restify helper
@@ -151,54 +198,60 @@ use Mojo::Base -strict;
 use Test::More;
 use Test::Mojo;
 
-my $t = Test::Mojo->new('Test::Mojolicious::Plugin::Restify');
+for my $app (
+  'Test::Mojolicious::Plugin::Restify::ArrayRef',
+  'Test::Mojolicious::Plugin::Restify::HashRef'
+  )
+{
+  my $t = Test::Mojo->new($app);
 
-# /attach/users/*
-$t->get_ok('/attach/global-users')->status_is(200)->content_is('list,');
-$t->get_ok('/attach/global-users/1')->status_is(200)->content_is('read,1');
-$t->get_ok('/attach/global-users/1/roles')->status_is(200)->content_is('list,');
-$t->get_ok('/attach/global-users/100/roles/500')->status_is(200)
-  ->content_is('read,100,500');
-$t->get_ok('/attach/global-users/0')->status_is(200)->content_is('read,0');
-$t->get_ok('/attach/global-users/-1')->status_is(404);
+  # /attach/users/*
+  $t->get_ok('/attach/global-users')->status_is(200)->content_is('list,');
+  $t->get_ok('/attach/global-users/1')->status_is(200)->content_is('read,1');
+  $t->get_ok('/attach/global-users/1/roles')->status_is(200)
+    ->content_is('list,');
+  $t->get_ok('/attach/global-users/100/roles/500')->status_is(200)
+    ->content_is('read,100,500');
+  $t->get_ok('/attach/global-users/0')->status_is(200)->content_is('read,0');
+  $t->get_ok('/attach/global-users/-1')->status_is(404);
 
-# /foo-bar
-$t->get_ok('/foo-bar')->status_is(200)->content_is('list,');
-$t->get_ok('/foo-bar/69')->status_is(200)->content_is('read,69');
+  # /foo-bar
+  $t->get_ok('/foo-bar')->status_is(200)->content_is('list,');
+  $t->get_ok('/foo-bar/69')->status_is(200)->content_is('read,69');
 
-# /foo-bar/bar
-$t->get_ok('/foo-bar/69/bar-bar')->status_is(200)->content_is('list,');
+  # /foo-bar/bar
+  $t->get_ok('/foo-bar/69/bar-bar')->status_is(200)->content_is('list,');
 
-# /invoices
-$t->get_ok('/invoices')->status_is(200)->content_is('list,');
-$t->post_ok('/invoices')->status_is(200)->content_is('create,');
-$t->get_ok('/invoices/bad-int')->status_is(404);
-$t->get_ok('/invoices/69')->status_is(200)->content_is('read,69');
-$t->delete_ok('/invoices/69')->status_is(200)->content_is('delete,69');
-$t->put_ok('/invoices/69')->status_is(200)->content_is('update,69');
+  # /invoices
+  $t->get_ok('/invoices')->status_is(200)->content_is('list,');
+  $t->post_ok('/invoices')->status_is(200)->content_is('create,');
+  $t->get_ok('/invoices/bad-int')->status_is(404);
+  $t->get_ok('/invoices/69')->status_is(200)->content_is('read,69');
+  $t->delete_ok('/invoices/69')->status_is(200)->content_is('delete,69');
+  $t->put_ok('/invoices/69')->status_is(200)->content_is('update,69');
 
-# /messages
-$t->get_ok('/messages')->status_is(200)->content_is('list,');
-$t->post_ok('/messages')->status_is(200)->content_is('create,');
-$t->get_ok('/messages/bad-uuid')->status_is(404);
-$t->get_ok('/messages/8dd5c2a0-9d39-11e3-a5e2-0800200c9a66')->status_is(200)
-  ->content_is('read,8dd5c2a0-9d39-11e3-a5e2-0800200c9a66');
-$t->get_ok('/messages/8dd5c2a09d3911e3a5e20800200c9a66')->status_is(200)
-  ->content_is('read,8dd5c2a09d3911e3a5e20800200c9a66');
-$t->get_ok('/messages/8DD5C2A09D3911E3A5E20800200C9A66')->status_is(200)
-  ->content_is('read,8DD5C2A09D3911E3A5E20800200C9A66');
+  # /messages
+  $t->get_ok('/messages')->status_is(200)->content_is('list,');
+  $t->post_ok('/messages')->status_is(200)->content_is('create,');
+  $t->get_ok('/messages/bad-uuid')->status_is(404);
+  $t->get_ok('/messages/8dd5c2a0-9d39-11e3-a5e2-0800200c9a66')->status_is(200)
+    ->content_is('read,8dd5c2a0-9d39-11e3-a5e2-0800200c9a66');
+  $t->get_ok('/messages/8dd5c2a09d3911e3a5e20800200c9a66')->status_is(200)
+    ->content_is('read,8dd5c2a09d3911e3a5e20800200c9a66');
+  $t->get_ok('/messages/8DD5C2A09D3911E3A5E20800200C9A66')->status_is(200)
+    ->content_is('read,8DD5C2A09D3911E3A5E20800200C9A66');
 
-# /users/*
-$t->get_ok('/users')->status_is(200)->content_is('list,');
-$t->get_ok('/users/1')->status_is(200)->content_is('read,1');
-$t->get_ok('/users/1/roles')->status_is(200)->content_is('list,');
-$t->get_ok('/users/100/roles/500')->status_is(200)->content_is('read,100,500');
-$t->get_ok('/users/0')->status_is(200)->content_is('read,0');
-$t->get_ok('/users/-1')->status_is(404);
+  # /users/*
+  $t->get_ok('/users')->status_is(200)->content_is('list,');
+  $t->get_ok('/users/1')->status_is(200)->content_is('read,1');
+  $t->get_ok('/users/1/roles')->status_is(200)->content_is('list,');
+  $t->get_ok('/users/100/roles/500')->status_is(200)
+    ->content_is('read,100,500');
+  $t->get_ok('/users/0')->status_is(200)->content_is('read,0');
+  $t->get_ok('/users/-1')->status_is(404);
 
-# collection options
-$t->get_ok('/withoutlookup/1')->status_is(200);
+  # collection options
+  $t->get_ok('/withoutlookup/1')->status_is(200);
+}
 
 done_testing();
-
-$t->app;

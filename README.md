@@ -11,7 +11,7 @@ Route shortcuts & helpers for REST collections for the
   sub startup {
     my $self = shift;
 
-    # imports the `collection' route shortcut and `restify' helpers
+    # imports the `collection' route shortcut and `restify' helper
     $self->plugin('Restify');
 
     # add REST collection endpoints manually
@@ -19,32 +19,46 @@ Route shortcuts & helpers for REST collections for the
     my $accounts = $r->collection('accounts');      # /accounts
     $accounts->collection('invoices');              # /accounts/:accounts_id/invoices
 
-    # or add the equivalent REST routes using the restify helper
-    # my $r = $self->routes;
-    # $self->restify->routes($r, {accounts => {invoices => undef}});
-  }
+    # or add the equivalent REST routes with an ARRAYREF (the helper will
+    # create chained routes from the path 'accounts/invoices' so you don't need
+    # to set ['accounts', 'accounts/invoices'])
+    my $r = $self->routes;
+    $self->restify->routes($r, ['accounts/invoices']);
 
+    # or add the equivalent REST routes with a HASHREF (might be easier to
+    # visualise how collections are chained together)
+    my $r = $self->routes;
+    $self->restify->routes($r, {
+      accounts => {
+        invoices => undef
+      }
+    });
+  }
+```
+
+Next create your controller for accounts.
+
+```perl
   # Restify controller depicting the REST actions for the /accounts collection.
   # (The name of the controller is the Mojo::Util::camelized version of the
   # collection path.)
   package MyApp::Controller::Accounts;
   use Mojo::Base 'Mojolicious::Controller';
 
-  sub under {
+  sub resource_lookup {
     my $c = shift;
 
-    # To consistenly get the element's ID relative to the under action, use the
-    # helper as shown below. If you need to access an element ID from a
-    # collection further up the chain, you can access it from the stash.
+    # To consistenly get the element's ID relative to the resource_lookup
+    # action, use the helper as shown below. If you need to access an element ID
+    # from a collection further up the chain, you can access it from the stash.
     #
     # The naming convention is the name of the collection appended with '_id'.
     # E.g., $c->stash('accounts_id').
-    my $account = lookup_account_resource($c->restify->current_id);
+    my $account = your_lookup_account_resource_func($c->restify->current_id);
 
     # By stashing the $account here, it will now be available in the delete,
-    # read, patch, and update actions. This under action is added to every
-    # collection by default to help reduce your code, but can be disabled if
-    # you wish.
+    # read, patch, and update actions. This resource_lookup action is option,
+    # but added to every collection by default to help reduce your code.
     $c->stash(account => $account);
 
     # must return a positive value to continue the dispatch chain
@@ -63,7 +77,7 @@ Route shortcuts & helpers for REST collections for the
   sub read {
     my $c = shift;
 
-    # account was placed in the stash in the under method
+    # account was placed in the stash in the resource_lookup action
     $c->render(json => $c->stash('account'));
   }
 
@@ -91,15 +105,17 @@ conditions](https://metacpan.org/pod/Mojolicious::Routes#conditions).
   # The collection route shortcut below creates the following routes, and maps
   # them to controllers of the camelized route's name.
   #
-  # /accounts           *         accounts
-  #   +/                GET       "accounts_list"       Accounts::list
-  #   +/                POST      "accounts_create"     Accounts::create
-  #   +/:accounts_id    *         "accounts"
-  #     +/              *         "accounts_under"      Accounts::under
-  #       +/            DELETE    "accounts_delete"     Accounts::delete
-  #       +/            GET       "accounts_read"       Accounts::read
-  #       +/            PATCH     "accounts_patch"      Accounts::patch
-  #       +/            PUT       "accounts_update"     Accounts::update
+  # Pattern           Methods   Name                        Class::Method Name
+  # -------           -------   ----                        ------------------
+  # /accounts         *         accounts
+  #   +/              GET       "accounts_list"             Accounts::list
+  #   +/              POST      "accounts_create"           Accounts::create
+  #   +/:accounts_id  *         "accounts"
+  #     +/            *         "accounts_resource_lookup"  Accounts::resource_lookup
+  #       +/          DELETE    "accounts_delete"           Accounts::delete
+  #       +/          GET       "accounts_read"             Accounts::read
+  #       +/          PATCH     "accounts_patch"            Accounts::patch
+  #       +/          PUT       "accounts_update"           Accounts::update
 
   # expects the element id (:accounts_id) for this collection to be a uuid
   my $route = $r->collection('accounts', over => 'uuid');
