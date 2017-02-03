@@ -3,16 +3,18 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Util qw(camelize);
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 sub register {
   my ($self, $app, $conf) = @_;
 
   $conf //= {};
+
   # over defaults to the standard route condition check (allow all)
   $conf->{over} //= 'standard';
-  # unders are added to all the element resource routes by default
-  $conf->{under} //= 1;
+
+  # resource_lookup methods are added to element resource routes by default
+  $conf->{resource_lookup} //= 1;
 
   # When adding route conditions, warn developers if the exported conditions
   # already exist.
@@ -74,8 +76,7 @@ sub register {
       # generate "/$path" collection route
       my $controller
         = $options->{controller} ? "$options->{controller}-$path" : $path;
-      my $collection
-        = $r->route("/$options->{route_path}")->to("$controller#");
+      my $collection = $r->route("/$options->{route_path}")->to("$controller#");
       $collection->get->to("#list")->name("$options->{route_name}_list");
       $collection->post->to("#create")->name("$options->{route_name}_create");
 
@@ -91,26 +92,27 @@ sub register {
       my $path    = shift;
       my $options = ref $_[0] eq 'HASH' ? shift : {@_};
 
-      $options->{over}  //= $conf->{over};
-      $options->{under} //= $conf->{under};
+      $options->{over}            //= $conf->{over};
+      $options->{resource_lookup} //= $conf->{resource_lookup};
       $path =~ tr/-/_/;
       $options->{route_name}
         = $options->{prefix} ? "$options->{prefix}_$path" : $path;
 
-      # generate "/$path/:id" element route with standard placeholder
+      # generate "/$path/:id" element route with specific placeholder
       my $element
         = $r->route("/:${path}_id")->over($options->{over} => "${path}_id")
         ->name($options->{route_name});
 
-      # Generate remaining CRUD routes for "/$path/:id", but also create an
-      # under for the resource $element.
+      # Generate remaining CRUD routes for "/$path/:id", optionally creating a
+      # resource_lookup method for the resource $element.
       #
-      # This method allows loading an object using the :id in the under,
+      # This method allows loading an object using the :id in resource_lookup,
       # and have it accessible via the stash in DELETE, GET, PUT etc. methods
       # in your controller.
       my $under
-        = $options->{under}
-        ? $element->under->to('#under')->name("$options->{route_name}_under")
+        = $options->{resource_lookup}
+        ? $element->under->to('#resource_lookup')
+        ->name("$options->{route_name}_resource_lookup")
         : $element;
       $under->delete->to('#delete')->name("$options->{route_name}_delete");
       $under->get->to('#read')->name("$options->{route_name}_read");
@@ -136,15 +138,14 @@ sub register {
       return unless $routes;
 
       $defaults //= {};
-      $defaults->{under} //= $conf->{under};
+      $defaults->{resource_lookup} //= $conf->{resource_lookup};
 
       while (my ($name, $attrs) = each %$routes) {
         my $paths   = {};
         my $options = {%$defaults};
 
         if (ref $attrs eq 'ARRAY') {
-          $options = {%$options, %{$attrs->[-1]}}
-            if ref $attrs->[-1] eq 'HASH';
+          $options = {%$options, %{$attrs->[-1]}} if ref $attrs->[-1] eq 'HASH';
           $paths = shift @$attrs if ref $attrs->[0] eq 'HASH';
         }
         elsif (ref $attrs eq 'HASH') {
@@ -156,12 +157,13 @@ sub register {
           $controller =~ tr/-/_/;
           my $collection = $r->collection($name, {%$options, element => 0});
           my $under
-            = $options->{under}
+            = $options->{resource_lookup}
             ? $collection->under->to($options->{controller}
-            ? "$options->{controller}-$controller#under"
-            : "$controller#under")
+            ? "$options->{controller}-$controller#resource_lookup"
+            : "$controller#resource_lookup")
             : $collection;
-          my $endpoint = $under->element($name, {%$options, under => 0});
+          my $endpoint
+            = $under->element($name, {%$options, resource_lookup => 0});
           $options->{controller}
             = $options->{controller}
             ? "$options->{controller}-$controller"
@@ -218,21 +220,20 @@ Mojolicious::Plugin::Restify - Route shortcuts & helpers for REST collections
   package MyApp::Controller::Accounts;
   use Mojo::Base 'Mojolicious::Controller';
 
-  sub under {
+  sub resource_lookup {
     my $c = shift;
 
-    # To consistenly get the element's ID relative to the under action, use the
-    # helper as shown below. If you need to access an element ID from a
-    # collection further up the chain, you can access it from the stash.
+    # To consistenly get the element's ID relative to the resource_lookup
+    # action, use the helper as shown below. If you need to access an element ID
+    # from a collection further up the chain, you can access it from the stash.
     #
     # The naming convention is the name of the collection appended with '_id'.
     # E.g., $c->stash('accounts_id').
-    my $account = lookup_account_resource($c->restify->current_id);
+    my $account = your_lookup_account_resource_func($c->restify->current_id);
 
     # By stashing the $account here, it will now be available in the delete,
-    # read, patch, and update actions. This under action is added to every
-    # collection by default to help reduce your code, but can be disabled if
-    # you wish.
+    # read, patch, and update actions. This resource_lookup action is added to
+    # every collection by default to help reduce your code, but can be disabled.
     $c->stash(account => $account);
 
     # must return a positive value to continue the dispatch chain
@@ -251,7 +252,7 @@ Mojolicious::Plugin::Restify - Route shortcuts & helpers for REST collections
   sub read {
     my $c = shift;
 
-    # account was placed in the stash in the under method
+    # account was placed in the stash in the resource_lookup action
     $c->render(json => $c->stash('account'));
   }
 
@@ -276,15 +277,17 @@ to the name of a route condition. See L<Mojolicious::Routes/conditions>.
   # The collection route shortcut below creates the following routes, and maps
   # them to controllers of the camelized route's name.
   #
-  # /accounts           *         accounts
-  #   +/                GET       "accounts_list"       Accounts::list
-  #   +/                POST      "accounts_create"     Accounts::create
-  #   +/:accounts_id    *         "accounts"
-  #     +/              *         "accounts_under"      Accounts::under
-  #       +/            DELETE    "accounts_delete"     Accounts::delete
-  #       +/            GET       "accounts_read"       Accounts::read
-  #       +/            PATCH     "accounts_patch"      Accounts::patch
-  #       +/            PUT       "accounts_update"     Accounts::update
+  # Pattern           Methods   Name                        Class::Method Name
+  # -------           -------   ----                        ------------------
+  # /accounts         *         accounts
+  #   +/              GET       "accounts_list"             Accounts::list
+  #   +/              POST      "accounts_create"           Accounts::create
+  #   +/:accounts_id  *         "accounts"
+  #     +/            *         "accounts_resource_lookup"  Accounts::resource_lookup
+  #       +/          DELETE    "accounts_delete"           Accounts::delete
+  #       +/          GET       "accounts_read"             Accounts::read
+  #       +/          PATCH     "accounts_patch"            Accounts::patch
+  #       +/          PUT       "accounts_update"           Accounts::update
 
   # expects the element id (:accounts_id) for this collection to be a uuid
   my $route = $r->collection('accounts', over => 'uuid');
@@ -304,17 +307,18 @@ L<Mojolicious::Plugin::Restify> implements the following helpers.
 Returns the I<element> id at the current point in the dispatch chain.
 
 This is the only way to guarantee the correct I<element>'s resource ID in a
-L<Mojolicious::Plugin::Restify> I<action>. The C<under> I<action> which is added
-by default in both L</collection> and L</restify-routes> is added at different
-positions of the dispatch chain. As such, the router might not have added the
-value of any placeholders to the L<Mojolicious::Controller::stash> yet.
+L<Mojolicious::Plugin::Restify> I<action>. The C<resource_lookup> I<action>,
+which is added by default in both L</collection> and L</restify-routes>, is
+added at different positions of the dispatch chain. As such, the router might
+not have added the value of any placeholders to the
+L<Mojolicious::Controller::stash> yet.
 
 =head2 restify->routes
 
 This helper allows you to create REST I<collections> from a Perl C<HASH>. It
 uses the key/values to invoke the L</collection> route shortcut with any route-
 specific options. It automatically chains routes to each parent, and
-progressively builds a namespace as it traverses through every key.
+progressively builds a namespace as it traverses through each key.
 
 See L</collection> for more route-specific options.
 
@@ -422,8 +426,8 @@ C</accounts/:accounts_id>) supports I<delete> (C<DELETE>), I<read> (C<GET>),
 I<patch> (C<PATCH>), and I<update> (C<PUT>) actions.
 
 By default, every HTTP request to a I<collection>'s I<element> is routed through
-an C<under> I<action> (see L<Mojolicious::Routes::Route/under>). This helps
-reduce the process of looking up a resource to a single location. See
+a C<resource_lookup> I<action> (see L<Mojolicious::Routes::Route/under>). This
+helps reduce the process of looking up a resource to a single location. See
 L</SYNOPSIS> for an example of its use.
 
 =head4 options
@@ -490,12 +494,12 @@ Adds a prefix to the automatically generated route
 L<name|Mojolicious::Routes::Route/name> for each I<collection> and I<element>
 I<action>.
 
-=item under
+=item resource_lookup
 
-  $r->collection('nounder', under => 0);
+  $r->collection('nolookup', resource_lookup => 0);
 
-Enables or disables adding an C<under> I<action> to the I<element> of the
-I<collection>.
+Enables or disables adding a C<resource_lookup> I<action> to the I<element> of
+the I<collection>.
 
 =back
 
@@ -510,7 +514,7 @@ by L</collection> to add the I<element> routes to a I<collection>. You shouldn't
 need to call this shortcut directly.
 
 When an element is added to a I<collection>'s route, the resource ID is captured
-using a standard placeholder.
+using a standard placeholder by default.
 
 =head1 CREDITS
 
@@ -524,7 +528,7 @@ Dragoș-Robert Neagu
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2015-2016, Paul Williams.
+Copyright (C) 2015-2017, Paul Williams.
 
 This program is free software, you can redistribute it and/or modify it under
 the terms of the Artistic License version 2.0.

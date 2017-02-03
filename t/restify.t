@@ -7,12 +7,12 @@ sub catchall {
   $self->render(text => "$msg,$id");
 }
 
-sub under  {1}
-sub create { shift->catchall('create') }
-sub delete { shift->catchall('delete') }
-sub list   { shift->catchall('list') }
-sub read   { shift->catchall('read') }
-sub update { shift->catchall('update') }
+sub resource_lookup {1}
+sub create          { shift->catchall('create') }
+sub delete          { shift->catchall('delete') }
+sub list            { shift->catchall('list') }
+sub read            { shift->catchall('read') }
+sub update          { shift->catchall('update') }
 
 sub name {
   my $self = shift;
@@ -99,10 +99,10 @@ sub read {
 
 1;
 
-package My::Mojo::App::Withoutunder;
+package My::Mojo::App::Withoutlookup;
 use Mojo::Base 'My::Mojo::App::Base';
 
-sub under { shift->reply->not_found }
+sub resource_lookup { shift->reply->not_found }
 
 1;
 
@@ -140,7 +140,7 @@ sub startup {
   );
 
   # Collection test for specific options
-  $r->collection('withoutunder', under => 0);
+  $r->collection('withoutlookup', resource_lookup => 0);
 }
 
 1;
@@ -197,7 +197,7 @@ $t->get_ok('/users/0')->status_is(200)->content_is('read,0');
 $t->get_ok('/users/-1')->status_is(404);
 
 # collection options
-$t->get_ok('/withoutunder/1')->status_is(200);
+$t->get_ok('/withoutlookup/1')->status_is(200);
 
 done_testing();
 

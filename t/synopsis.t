@@ -7,12 +7,12 @@ sub catchall {
   $self->render(text => "$msg,$id");
 }
 
-sub under { 1 }
-sub create { shift->catchall('create') }
-sub delete { shift->catchall('delete') }
-sub list   { shift->catchall('list')   }
-sub read   { shift->catchall('read')   }
-sub update { shift->catchall('update') }
+sub resource_lookup {1}
+sub create          { shift->catchall('create') }
+sub delete          { shift->catchall('delete') }
+sub list            { shift->catchall('list') }
+sub read            { shift->catchall('read') }
+sub update          { shift->catchall('update') }
 
 sub name {
   my $self = shift;
@@ -40,7 +40,7 @@ sub startup {
   my $self = shift;
 
   # imports the `collection' route shortcut and `restify' helpers
-  $self->plugin('Restify', { over => 'int' });
+  $self->plugin('Restify', {over => 'int'});
 
   # add REST collection endpoints manually
 #  my $r = $self->routes;
