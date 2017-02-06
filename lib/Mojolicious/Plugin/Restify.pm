@@ -97,11 +97,11 @@ sub register {
       $path =~ tr/-/_/;
       $options->{route_name}
         = $options->{prefix} ? "$options->{prefix}_$path" : $path;
+      $options->{route_placeholder} //= ':';
 
       # generate "/$path/:id" element route with specific placeholder
-      my $element
-        = $r->route("/:${path}_id")->over($options->{over} => "${path}_id")
-        ->name($options->{route_name});
+      my $element = $r->route("/$options->{route_placeholder}${path}_id")
+        ->over($options->{over} => "${path}_id")->name($options->{route_name});
 
       # Generate remaining CRUD routes for "/$path/:id", optionally creating a
       # resource_lookup method for the resource $element.
