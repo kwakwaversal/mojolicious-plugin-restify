@@ -232,7 +232,7 @@ Mojolicious::Plugin::Restify - Route shortcuts & helpers for REST collections
   sub startup {
     my $self = shift;
 
-    # imports the `collection' route shortcut and `restify' helper
+    # imports the `collection' route shortcut and `restify' helpers
     $self->plugin('Restify');
 
     # add REST collection endpoints manually
@@ -276,7 +276,7 @@ Next create your controller for accounts.
     my $account = your_lookup_account_resource_func($c->restify->current_id);
 
     # By stashing the $account here, it will now be available in the delete,
-    # read, patch, and update actions. This resource_lookup action is option,
+    # read, patch, and update actions. This resource_lookup action is optional,
     # but added to every collection by default to help reduce your code.
     $c->stash(account => $account);
 
