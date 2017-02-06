@@ -137,6 +137,10 @@ sub register {
       my ($self, $r, $routes, $defaults) = @_;
       return unless $routes;
 
+      # Allow users to simplify their route creation using an array ref!
+      $routes = _arrayref_to_hashref($routes)
+        if ref $routes && ref $routes eq 'ARRAY';
+
       $defaults //= {};
       $defaults->{resource_lookup} //= $conf->{resource_lookup};
 
@@ -161,6 +165,7 @@ sub register {
             ? $collection->under->to($options->{controller}
             ? "$options->{controller}-$controller#resource_lookup"
             : "$controller#resource_lookup")
+            ->name("${controller}_resource_lookup")
             : $collection;
           my $endpoint
             = $under->element($name, {%$options, resource_lookup => 0});
@@ -184,6 +189,32 @@ sub register {
   );
 }
 
+# Aargh eurgh ma bwains!
+sub _arrayref_to_hashref {
+  my $arrayref = shift;
+  return {} unless defined $arrayref;
+
+  my $hashref = {};
+  for my $path (@$arrayref) {
+    my $options;
+    if (ref $path and ref $path eq 'ARRAY') {
+      ($path, $options) = @$path;
+    }
+    my @parts = split '/', $path;
+    if (@parts == 1) {
+      $hashref->{shift @parts} = defined $options ? [undef, $options] : undef;
+    }
+    else {
+      my $key = shift @parts;
+      $hashref->{$key} //= {};
+      $hashref->{$key}
+        = {%{$hashref->{$key}}, %{_arrayref_to_hashref([join '/', @parts])}};
+    }
+  }
+
+  return $hashref;
+}
+
 1;
 
 =encoding utf8
@@ -201,7 +232,7 @@ Mojolicious::Plugin::Restify - Route shortcuts & helpers for REST collections
   sub startup {
     my $self = shift;
 
-    # imports the `collection' route shortcut and `restify' helpers
+    # imports the `collection' route shortcut and `restify' helper
     $self->plugin('Restify');
 
     # add REST collection endpoints manually
@@ -209,10 +240,23 @@ Mojolicious::Plugin::Restify - Route shortcuts & helpers for REST collections
     my $accounts = $r->collection('accounts');      # /accounts
     $accounts->collection('invoices');              # /accounts/:accounts_id/invoices
 
-    # or add the equivalent REST routes using the restify helper
-    # my $r = $self->routes;
-    # $self->restify->routes($r, {accounts => {invoices => undef}});
+    # or add the equivalent REST routes with an ARRAYREF (the helper will
+    # create chained routes from the path 'accounts/invoices' so you don't need
+    # to set ['accounts', 'accounts/invoices'])
+    my $r = $self->routes;
+    $self->restify->routes($r, ['accounts/invoices']);
+
+    # or add the equivalent REST routes with a HASHREF (might be easier to
+    # visualise how collections are chained together)
+    my $r = $self->routes;
+    $self->restify->routes($r, {
+      accounts => {
+        invoices => undef
+      }
+    });
   }
+
+Next create your controller for accounts.
 
   # Restify controller depicting the REST actions for the /accounts collection.
   # (The name of the controller is the Mojo::Util::camelized version of the
@@ -232,8 +276,8 @@ Mojolicious::Plugin::Restify - Route shortcuts & helpers for REST collections
     my $account = your_lookup_account_resource_func($c->restify->current_id);
 
     # By stashing the $account here, it will now be available in the delete,
-    # read, patch, and update actions. This resource_lookup action is added to
-    # every collection by default to help reduce your code, but can be disabled.
+    # read, patch, and update actions. This resource_lookup action is option,
+    # but added to every collection by default to help reduce your code.
     $c->stash(account => $account);
 
     # must return a positive value to continue the dispatch chain
@@ -311,16 +355,79 @@ L<Mojolicious::Plugin::Restify> I<action>. The C<resource_lookup> I<action>,
 which is added by default in both L</collection> and L</restify-routes>, is
 added at different positions of the dispatch chain. As such, the router might
 not have added the value of any placeholders to the
-L<Mojolicious::Controller::stash> yet.
+L<Mojolicious::Controller/stash> yet.
 
 =head2 restify->routes
 
-This helper allows you to create REST I<collections> from a Perl C<HASH>. It
-uses the key/values to invoke the L</collection> route shortcut with any route-
-specific options. It automatically chains routes to each parent, and
-progressively builds a namespace as it traverses through each key.
+This helper is a wrapper around the L</collection> route shortcut. It
+facilitates creating REST I<collections> using either an C<ARRAYREF> or
+C<HASHREF>.
 
-See L</collection> for more route-specific options.
+It takes a L<Mojolicious::Routes> object, the I<paths> to create, and optionally
+I<options> which are passed to the L</collection> route shortcut.
+
+  # /accounts
+  # /accounts/1234
+  $self->restify->routes($self->routes, ['accounts'], {over => 'int'});
+
+  # /invoices
+  # /invoices/76be1f53-8363-4ac6-bd83-8b49e07b519c
+  $self->restify->routes($self->routes, ['invoices'], {over => 'uuid'});
+
+Maybe you want to chain them.
+
+  # /accounts
+  # /accounts/1234
+  #   /accounts/1234/invoices
+  #   /accounts/1234/invoices/76be1f53-8363-4ac6-bd83-8b49e07b519c
+  $self->restify->routes(
+    $self->routes,
+    ['accounts', ['accounts/invoices' => {over => 'uuid'}]],
+    {over => 'int'}
+  );
+
+=over
+
+=item ARRAYREF
+
+Using the elements of the array, invokes L</collection>, passing any route-
+specific options.
+
+It will automatically create and chain parent routes if you pass a full path
+e.g., C<['a/very/long/path']>. This is equivalent to the shell command
+C<mkdir -p>.
+
+  my $restify_routes = [
+    # /area-codes
+    #   /area-codes/:area_codes_id/numbers
+    'area-codes/numbers',
+    # /news
+    'news',
+    # /payments
+    ['payments' => {over => 'int'}],   # overrides default uuid route condition
+    # /users
+    #   /users/:users_id/messages
+    #     /users/:users_id/messages/:messages_id/recipients
+    'users/messages/recipients',
+  ];
+
+  $self->restify->routes($self->routes, $restify_routes, {over => 'uuid'});
+
+In its most basic form, C<REST> routes are created from a C<SCALAR>.
+
+  # /accounts
+  my $restify_routes = ['accounts'];
+
+=item HASHREF
+
+Using the key/values of the hash, invokes L</collection>, passing any route-
+specific options.
+
+It automatically chains routes to each parent, and progressively builds a
+namespace as it traverses through each key.
+
+N.B., This was implemented before the C<ARRAYREF> version, and is arguably a bit
+more confusing. It might be dropped in a later version to simplify the API.
 
   my $restify_routes = {
     # /area-codes
@@ -331,7 +438,7 @@ See L</collection> for more route-specific options.
     # /news
     'news' => undef,
     # /payments
-    'payments' => [undef, {over => 'int'}],   # overrides default uuid route condition set below
+    'payments' => [undef, {over => 'int'}],   # overrides default uuid route condition
     # /users
     #   /users/:users_id/messages
     #     /users/:users_id/messages/:messages_id/recipients
@@ -343,6 +450,8 @@ See L</collection> for more route-specific options.
   };
 
   $self->restify->routes($self->routes, $restify_routes, {over => 'uuid'});
+
+=back
 
 =head1 METHODS
 
@@ -521,6 +630,8 @@ using a standard placeholder by default.
 In alphabetical order:
 
 =over 2
+
+Castaway
 
 Dragoș-Robert Neagu
 

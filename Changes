@@ -3,6 +3,7 @@
 0.04  2017-02-03
   - Breaking change. Renaming element method 'under' to 'resource_lookup' to
     be less ambiguous. (Thanks Castaway.)
+  - Add collections using restify routers helper with an ARRAYREF.
 
 0.03  2016-06-20
   - Testing against 5.22.
