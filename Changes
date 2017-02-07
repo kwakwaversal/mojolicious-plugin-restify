@@ -1,5 +1,8 @@
 -----------------------------------------------------
 
+0.05  2017-02-07
+  - Added placeholder option when creating a collection.
+
 0.04  2017-02-03
   - Breaking change. Renaming element method 'under' to 'resource_lookup' to
     be less ambiguous. (Thanks Castaway.)
