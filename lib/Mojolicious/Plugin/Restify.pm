@@ -3,7 +3,7 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Util qw(camelize);
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 sub register {
   my ($self, $app, $conf) = @_;
@@ -93,15 +93,15 @@ sub register {
       my $options = ref $_[0] eq 'HASH' ? shift : {@_};
 
       $options->{over}            //= $conf->{over};
+      $options->{placeholder}     //= ':';
       $options->{resource_lookup} //= $conf->{resource_lookup};
       $path =~ tr/-/_/;
       $options->{route_name}
         = $options->{prefix} ? "$options->{prefix}_$path" : $path;
 
       # generate "/$path/:id" element route with specific placeholder
-      my $element
-        = $r->route("/:${path}_id")->over($options->{over} => "${path}_id")
-        ->name($options->{route_name});
+      my $element = $r->route("/$options->{placeholder}${path}_id")
+        ->over($options->{over} => "${path}_id")->name($options->{route_name});
 
       # Generate remaining CRUD routes for "/$path/:id", optionally creating a
       # resource_lookup method for the resource $element.
@@ -524,8 +524,14 @@ L<Mojolicious::Plugin::Restify> implements the following route shortcuts.
 
   my $r = $self->routes;
   $r->collection('accounts');
+  $r->collection('accounts', controller      => 'differentmodule');
+  $r->collection('accounts', element         => 0);
+  $r->collection('accounts', over            => 'uuid');
+  $r->collection('accounts', placeholder     => '*');
+  $r->collection('accounts', prefix          => 'v1');
+  $r->collection('accounts', resource_lookup => '0');
 
-A L<Mojolicious routes shortcut|Mojolicious::Routes/shortcuts> which helps
+A L<Mojolicious route shortcut|Mojolicious::Routes/shortcuts> which helps
 create the most common REST L<routes|Mojolicious::Routes::Route> for a
 I<collection> endpoint and its associated I<element>.
 
@@ -536,8 +542,8 @@ I<patch> (C<PATCH>), and I<update> (C<PUT>) actions.
 
 By default, every HTTP request to a I<collection>'s I<element> is routed through
 a C<resource_lookup> I<action> (see L<Mojolicious::Routes::Route/under>). This
-helps reduce the process of looking up a resource to a single location. See
-L</SYNOPSIS> for an example of its use.
+helps reduce the process of looking up a I<collection>'s resource to a single
+location. See L</SYNOPSIS> for an example of its use.
 
 =head4 options
 
@@ -576,18 +582,48 @@ default.
   # DELETE,GET,PATCH,PUT,UPDATE   /messages/1   404
   $r->collection('messages', element => 0);
 
-Enables or disables adding an I<element> to the I<collection>. Disabling the
+Enables or disables chaining an I<element> to the I<collection>. Disabling the
 element portion of a I<collection> means that only the I<create> and I<list>
 actions will be created.
 
 =item over
 
-  $r->collection('accounts', over => 'uuid');
   $r->collection('invoices', over => 'int');
+  $r->collection('invoices', over => 'standard');
+  $r->collection('accounts', over => 'uuid');
 
 Allows a I<collection>'s I<element> to be restricted to a specific data type
 using Mojolicious' route conditions. L</int>, L</standard> and L</uuid> are
 added automatically if they don't already exist.
+
+=item placeholder
+
+  # /versions/:versions_id      { versions_id => '123'}
+  # /versions/#versions_id      { versions_id => '123.00'}
+  # /versions/*versions_id      { versions_id => '123.00/1'}
+
+The placeholder is used to capture the I<element> id within a route. It can be
+one of C<standard ':'>, C<relaxed '#'> or C<wildcard '*'>. You might need to
+adjust the placholder option in certain scenarios, but the C<standard>
+placeholder should suffice for most normal REST endpoints.
+
+  $r->collection('/messages', placeholder => ':');
+
+I<Elements> are chained to a I<collection> using the standard placeholder by
+default. They match all characters except C</> and C<.>. See
+L<Mojolicious::Guides::Routing/Standard-placeholders>.
+
+  $r->collection('/relaxed-messages', placeholder => '#');
+
+Placeholders can be relaxed, matching all characters expect C</>. Useful if you
+need to capture a domain name within a route. See
+L<Mojolicious::Guides::Routing/Relaxed-placeholders>.
+
+  $r->collection('/wildcard-messages', placeholder => '*');
+
+Or they can be greedy, matching everything, inclusive of C</> and C<.>. Useful
+if you need to capture everything within a route. See
+L<Mojolicious::Guides::Routing/Wildcard-placeholders>.
 
 =item prefix
 
