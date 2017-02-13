@@ -3,12 +3,20 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Util qw(camelize);
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 sub register {
   my ($self, $app, $conf) = @_;
 
   $conf //= {};
+
+  # default HTTP method to class method mappings for resource elements
+  $conf->{method_map} = {
+    delete => 'delete',
+    get    => 'read',
+    patch  => 'patch',
+    put    => 'update',
+  };
 
   # over defaults to the standard route condition check (allow all)
   $conf->{over} //= 'standard';
@@ -99,6 +107,9 @@ sub register {
       $options->{route_name}
         = $options->{prefix} ? "$options->{prefix}_$path" : $path;
 
+      local $options->{method_map} = $options->{method_map}
+        // $conf->{method_map};
+
       # generate "/$path/:id" element route with specific placeholder
       my $element = $r->route("/$options->{placeholder}${path}_id")
         ->over($options->{over} => "${path}_id")->name($options->{route_name});
@@ -114,10 +125,13 @@ sub register {
         ? $element->under->to('#resource_lookup')
         ->name("$options->{route_name}_resource_lookup")
         : $element;
-      $under->delete->to('#delete')->name("$options->{route_name}_delete");
-      $under->get->to('#read')->name("$options->{route_name}_read");
-      $under->patch->to('#patch')->name("$options->{route_name}_patch");
-      $under->put->to('#update')->name("$options->{route_name}_update");
+
+      # Map HTTP methods to class methods
+      while (my ($http_method, $method) = each %{$options->{method_map}}) {
+        # print STDERR "$options->{route_name}_$method -> $http_method -> $method\n";
+        $under->$http_method->to("#$method")
+          ->name("$options->{route_name}_$method");
+      }
 
       return $element;
     }
