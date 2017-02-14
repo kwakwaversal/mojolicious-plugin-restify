@@ -126,9 +126,8 @@ sub register {
         ->name("$options->{route_name}_resource_lookup")
         : $element;
 
-      # Map HTTP methods to class methods
+      # Map HTTP methods to instance methods/mojo actions
       while (my ($http_method, $method) = each %{$options->{method_map}}) {
-        # print STDERR "$options->{route_name}_$method -> $http_method -> $method\n";
         $under->$http_method->to("#$method")
           ->name("$options->{route_name}_$method");
       }
@@ -599,6 +598,26 @@ default.
 Enables or disables chaining an I<element> to the I<collection>. Disabling the
 element portion of a I<collection> means that only the I<create> and I<list>
 actions will be created.
+
+=item method_map
+
+  $r->collection(
+    'invoives',
+    {
+      method_map  => {
+        'delete' => 'delete',
+        'get'    => 'read',
+        'patch'  => 'patch',
+        'put'    => 'update',
+      }
+    }
+  );
+
+The above represents the default HTTP method mappings. It's possible to change
+the mappings globally (when importing the plugin) or per collection (as above).
+
+These HTTP method mappings only apply to the C<collection>'s C<element>. e.g.,
+C</invoices/:id>.
 
 =item over
 
