@@ -1,5 +1,8 @@
 -----------------------------------------------------
 
+0.06  2017-02-14
+  - HTTP method map for elements.
+
 0.05  2017-02-07
   - Added placeholder option when creating a collection.
 

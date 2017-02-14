@@ -3,12 +3,20 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Util qw(camelize);
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 sub register {
   my ($self, $app, $conf) = @_;
 
   $conf //= {};
+
+  # default HTTP method to class method mappings for resource elements
+  $conf->{method_map} = {
+    delete => 'delete',
+    get    => 'read',
+    patch  => 'patch',
+    put    => 'update',
+  };
 
   # over defaults to the standard route condition check (allow all)
   $conf->{over} //= 'standard';
@@ -99,6 +107,9 @@ sub register {
       $options->{route_name}
         = $options->{prefix} ? "$options->{prefix}_$path" : $path;
 
+      local $options->{method_map} = $options->{method_map}
+        // $conf->{method_map};
+
       # generate "/$path/:id" element route with specific placeholder
       my $element = $r->route("/$options->{placeholder}${path}_id")
         ->over($options->{over} => "${path}_id")->name($options->{route_name});
@@ -114,10 +125,12 @@ sub register {
         ? $element->under->to('#resource_lookup')
         ->name("$options->{route_name}_resource_lookup")
         : $element;
-      $under->delete->to('#delete')->name("$options->{route_name}_delete");
-      $under->get->to('#read')->name("$options->{route_name}_read");
-      $under->patch->to('#patch')->name("$options->{route_name}_patch");
-      $under->put->to('#update')->name("$options->{route_name}_update");
+
+      # Map HTTP methods to instance methods/mojo actions
+      while (my ($http_method, $method) = each %{$options->{method_map}}) {
+        $under->$http_method->to("#$method")
+          ->name("$options->{route_name}_$method");
+      }
 
       return $element;
     }
@@ -585,6 +598,26 @@ default.
 Enables or disables chaining an I<element> to the I<collection>. Disabling the
 element portion of a I<collection> means that only the I<create> and I<list>
 actions will be created.
+
+=item method_map
+
+  $r->collection(
+    'invoives',
+    {
+      method_map  => {
+        'delete' => 'delete',
+        'get'    => 'read',
+        'patch'  => 'patch',
+        'put'    => 'update',
+      }
+    }
+  );
+
+The above represents the default HTTP method mappings. It's possible to change
+the mappings globally (when importing the plugin) or per collection (as above).
+
+These HTTP method mappings only apply to the C<collection>'s C<element>. e.g.,
+C</invoices/:id>.
 
 =item over
 
