@@ -11,13 +11,13 @@ sub register {
   $conf //= {};
 
   # default HTTP method to instance method mappings for collections
-  $conf->{collection_method_map} = {
+  $conf->{collection_method_map} //= {
     get  => 'list',
     post => 'create',
   };
 
   # default HTTP method to instance method mappings for resource elements
-  $conf->{element_method_map} = {
+  $conf->{element_method_map} //= {
     delete => 'delete',
     get    => 'read',
     patch  => 'patch',
