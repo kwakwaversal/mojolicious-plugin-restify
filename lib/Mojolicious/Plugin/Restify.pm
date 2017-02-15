@@ -582,7 +582,7 @@ The following options allow a I<collection> to be fine-tuned.
 =item collection_method_map
 
   $r->collection(
-    'invoives',
+    'invoices',
     {
       collection_method_map => {
         get  => 'list',
@@ -639,7 +639,7 @@ actions will be created.
 =item element_method_map
 
   $r->collection(
-    'invoives',
+    'invoices',
     {
       element_method_map  => {
         'delete' => 'delete',
