@@ -3,15 +3,21 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Util qw(camelize);
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 sub register {
   my ($self, $app, $conf) = @_;
 
   $conf //= {};
 
-  # default HTTP method to class method mappings for resource elements
-  $conf->{method_map} = {
+  # default HTTP method to instance method mappings for collections
+  $conf->{collection_method_map} = {
+    get  => 'list',
+    post => 'create',
+  };
+
+  # default HTTP method to instance method mappings for resource elements
+  $conf->{element_method_map} = {
     delete => 'delete',
     get    => 'read',
     patch  => 'patch',
@@ -81,12 +87,19 @@ sub register {
       $options->{route_name}
         = $options->{prefix} ? "$options->{prefix}_$path" : $path;
 
+      local $options->{collection_method_map} = $options->{collection_method_map}
+        // $conf->{collection_method_map};
+
       # generate "/$path" collection route
       my $controller
         = $options->{controller} ? "$options->{controller}-$path" : $path;
       my $collection = $r->route("/$options->{route_path}")->to("$controller#");
-      $collection->get->to("#list")->name("$options->{route_name}_list");
-      $collection->post->to("#create")->name("$options->{route_name}_create");
+
+      # Map HTTP methods to instance methods/mojo actions
+      while (my ($http_method, $method) = each %{$options->{collection_method_map}}) {
+        $collection->$http_method->to("#$method")
+          ->name("$options->{route_name}_$method");
+      }
 
       return $options->{element}
         ? $collection->element($options->{route_path}, $options)
@@ -107,8 +120,8 @@ sub register {
       $options->{route_name}
         = $options->{prefix} ? "$options->{prefix}_$path" : $path;
 
-      local $options->{method_map} = $options->{method_map}
-        // $conf->{method_map};
+      local $options->{element_method_map} = $options->{element_method_map}
+        // $conf->{element_method_map};
 
       # generate "/$path/:id" element route with specific placeholder
       my $element = $r->route("/$options->{placeholder}${path}_id")
@@ -127,7 +140,7 @@ sub register {
         : $element;
 
       # Map HTTP methods to instance methods/mojo actions
-      while (my ($http_method, $method) = each %{$options->{method_map}}) {
+      while (my ($http_method, $method) = each %{$options->{element_method_map}}) {
         $under->$http_method->to("#$method")
           ->name("$options->{route_name}_$method");
       }
@@ -537,12 +550,14 @@ L<Mojolicious::Plugin::Restify> implements the following route shortcuts.
 
   my $r = $self->routes;
   $r->collection('accounts');
-  $r->collection('accounts', controller      => 'differentmodule');
-  $r->collection('accounts', element         => 0);
-  $r->collection('accounts', over            => 'uuid');
-  $r->collection('accounts', placeholder     => '*');
-  $r->collection('accounts', prefix          => 'v1');
-  $r->collection('accounts', resource_lookup => '0');
+  $r->collection('accounts', collection_method_map => {delete => 'delete_collection'});
+  $r->collection('accounts', controller            => 'differentmodule');
+  $r->collection('accounts', element               => 0);
+  $r->collection('accounts', element_method_map    => {get => 'read'});
+  $r->collection('accounts', over                  => 'uuid');
+  $r->collection('accounts', placeholder           => '*');
+  $r->collection('accounts', prefix                => 'v1');
+  $r->collection('accounts', resource_lookup       => '0');
 
 A L<Mojolicious route shortcut|Mojolicious::Routes/shortcuts> which helps
 create the most common REST L<routes|Mojolicious::Routes::Route> for a
@@ -563,6 +578,28 @@ location. See L</SYNOPSIS> for an example of its use.
 The following options allow a I<collection> to be fine-tuned.
 
 =over
+
+=item collection_method_map
+
+  $r->collection(
+    'invoives',
+    {
+      collection_method_map => {
+        get  => 'list',
+        post => 'create',
+        # delete => 'delete_collection',  # delete all-the-things!
+        # put    => 'update_collection'   # update all-the-things!
+      }
+    }
+  );
+
+The above represents the default HTTP method mappings for C<collections>. It's
+possible to change the mappings globally (when importing the plugin) or per
+collection (as above).
+
+These HTTP method mappings only apply to the C<collection>. e.g., C</invoices>.
+Please see C<element_method_map> if you want to apply different HTTP mappings
+to an C<element> like C</invoices/:id>.
 
 =item controller
 
@@ -599,12 +636,12 @@ Enables or disables chaining an I<element> to the I<collection>. Disabling the
 element portion of a I<collection> means that only the I<create> and I<list>
 actions will be created.
 
-=item method_map
+=item element_method_map
 
   $r->collection(
     'invoives',
     {
-      method_map  => {
+      element_method_map  => {
         'delete' => 'delete',
         'get'    => 'read',
         'patch'  => 'patch',
