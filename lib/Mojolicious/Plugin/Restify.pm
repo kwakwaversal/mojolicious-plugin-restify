@@ -153,7 +153,7 @@ sub register {
     'restify.current_id' => sub {
       my $c    = shift;
       my $name = $c->stash->{controller};
-      $name =~ s,^.*?\-,,;
+      $name =~ s,^.*\-,,;
       return $c->match->stack->[-1]->{"${name}_id"} // '';
     }
   );
