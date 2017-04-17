@@ -61,6 +61,36 @@ sub read {
 
 1;
 
+package My::Mojo::App::A;
+use Mojo::Base 'My::Mojo::App::Base';
+
+sub read {
+  my $self = shift;
+  $self->render(text => join ",", 'read', $self->restify->current_id);
+}
+
+1;
+
+package My::Mojo::App::A::B;
+use Mojo::Base 'My::Mojo::App::Base';
+
+sub read {
+  my $self = shift;
+  $self->render(text => join ",", 'read', $self->restify->current_id);
+}
+
+1;
+
+package My::Mojo::App::A::B::C;
+use Mojo::Base 'My::Mojo::App::Base';
+
+sub read {
+  my $self = shift;
+  $self->render(text => join ",", 'read', $self->restify->current_id);
+}
+
+1;
+
 package My::Mojo::App::FooBar;
 use Mojo::Base 'My::Mojo::App::Base';
 
@@ -122,6 +152,7 @@ sub startup {
 
   # REST routes config
   my $rest_routes = [
+    'a/b/c',
     'foo-bar',
     'foo-bar/bar-bar',
     'invoices',
@@ -164,6 +195,11 @@ sub startup {
 
   # REST routes config
   my $rest_routes = {
+    'a' => {
+        'b' => {
+            'c' => undef
+        }
+    },
     'foo-bar'  => {
         'bar-bar' => undef
     },
@@ -252,6 +288,11 @@ for my $app (
 
   # collection options
   $t->get_ok('/withoutlookup/1')->status_is(200);
+
+  # current_id test
+  $t->get_ok('/a/1')->content_is('read,1');
+  $t->get_ok('/a/1/b/2')->content_is('read,2');
+  $t->get_ok('/a/1/b/2/c/3')->content_is('read,3');
 }
 
 done_testing();
