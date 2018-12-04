@@ -93,13 +93,20 @@ sub register {
       # generate "/$path" collection route
       my $controller
         = $options->{controller} ? "$options->{controller}-$path" : $path;
-      my $collection = $r->route("/$options->{route_path}")->to("$controller#");
+      my $hashtag = $options->{abs_controller} ? '' : '#';
+      my $ns = $options->{abs_controller} && $options->{ns} ? $options->{ns} . '::' : '';
+      my $collection = $r->route("/$options->{route_path}")->to("$ns$controller$hashtag");
 
       # Map HTTP methods to instance methods/mojo actions
       while (my ($http_method, $method) = each %{$options->{collection_method_map}}) {
         $collection->$http_method->to("#$method")
           ->name("$options->{route_name}_$method");
       }
+      # allow call to alternative methods inside collections
+      # $path/foo calls method foo inside controller
+      $collection->get(":action/*opt")->to(action => 'list',
+         opt => undef)->name("$options->{route_name}_actionopt" )
+         if ($options->{allows_optional_action});
 
       return $options->{element}
         ? $collection->element($options->{route_path}, $options)
@@ -125,7 +132,7 @@ sub register {
 
       # generate "/$path/:id" element route with specific placeholder
       my $element = $r->route("/$options->{placeholder}${path}_id")
-        ->over($options->{over} => "${path}_id")->name($options->{route_name});
+        ->over($options->{over} => "${path}_id")->name($options->{route_name} . '_id');
 
       # Generate remaining CRUD routes for "/$path/:id", optionally creating a
       # resource_lookup method for the resource $element.
@@ -715,6 +722,27 @@ I<action>.
 
 Enables or disables adding a C<resource_lookup> I<action> to the I<element> of
 the I<collection>.
+
+=item abs_controller
+
+  $r->collection('accounts', abs_controller => 1);
+
+If unset controller name is joined with app namespace. If set to 1 the
+controller name is related only to local paths
+
+=item ns
+
+  $r->collection('accounts', abs_controller => 1, ns => 'anotherNS');
+
+If C<abs_controller> is set, you can set an alternative namespace using
+using this parameter.
+
+=item allows_optional_action
+
+  $r->collection('accounts', allows_optional_action => 1)
+
+If set, allow call to alternative methods inside collections so, as an example,
+accounts/foo/bar/1 calls method foo inside controller with bar=1 
 
 =back
 
