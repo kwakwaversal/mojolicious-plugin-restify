@@ -101,6 +101,12 @@ sub register {
           ->name("$options->{route_name}_$method");
       }
 
+      # allow call to alternative methods inside collections
+      # $path/foo calls method foo inside controller
+      $collection->get("list/:action/*opt")->to(action => 'list',
+         opt => undef)->name("$options->{route_name}_actionopt" )
+         if ($options->{allows_optional_action});
+
       return $options->{element}
         ? $collection->element($options->{route_path}, $options)
         : $collection;
@@ -558,6 +564,7 @@ L<Mojolicious::Plugin::Restify> implements the following route shortcuts.
   $r->collection('accounts', placeholder           => '*');
   $r->collection('accounts', prefix                => 'v1');
   $r->collection('accounts', resource_lookup       => '0');
+  $r->collection('accounts', allows_optional_action=> '0');
 
 A L<Mojolicious route shortcut|Mojolicious::Routes/shortcuts> which helps
 create the most common REST L<routes|Mojolicious::Routes::Route> for a
@@ -715,6 +722,13 @@ I<action>.
 
 Enables or disables adding a C<resource_lookup> I<action> to the I<element> of
 the I<collection>.
+
+=item allows_optional_action
+
+  $r->collection('accounts', allows_optional_action => 1)
+
+If set, allow call to alternative methods inside collections so, as an example,
+accounts/foo/bar/1 calls method foo inside controller with bar=1
 
 =back
 
