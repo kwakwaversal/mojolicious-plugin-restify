@@ -95,6 +95,7 @@ sub register {
         = $options->{controller} ? "$options->{controller}-$path" : $path;
       my $hashtag = $options->{abs_controller} ? '' : '#';
       my $ns = $options->{abs_controller} && $options->{ns} ? $options->{ns} . '::' : '';
+      $options->{real_controller} = $ns . $controller;
       my $collection = $r->route("/$options->{route_path}")->to("$ns$controller$hashtag");
 
       # Map HTTP methods to instance methods/mojo actions
@@ -104,7 +105,7 @@ sub register {
       }
       # allow call to alternative methods inside collections
       # $path/foo calls method foo inside controller
-      $collection->get(":action/*opt")->to(action => 'list',
+      $collection->get("list/:action/*opt")->to(action => 'list',
          opt => undef)->name("$options->{route_name}_actionopt" )
          if ($options->{allows_optional_action});
 
@@ -132,6 +133,7 @@ sub register {
 
       # generate "/$path/:id" element route with specific placeholder
       my $element = $r->route("/$options->{placeholder}${path}_id")
+      #my $element = $r->route("/$options->{placeholder}id")
         ->over($options->{over} => "${path}_id")->name($options->{route_name} . '_id');
 
       # Generate remaining CRUD routes for "/$path/:id", optionally creating a
@@ -146,9 +148,11 @@ sub register {
         ->name("$options->{route_name}_resource_lookup")
         : $element;
 
+
       # Map HTTP methods to instance methods/mojo actions
       while (my ($http_method, $method) = each %{$options->{element_method_map}}) {
-        $under->$http_method->to("#$method")
+        $under->$http_method->to(app => $options->{real_controller},
+            action => "$method")
           ->name("$options->{route_name}_$method");
       }
 
@@ -159,8 +163,9 @@ sub register {
   $app->helper(
     'restify.current_id' => sub {
       my $c    = shift;
-      my $name = $c->stash->{controller};
+      my $name = $c->stash->{app};
       $name =~ s,^.*\-,,;
+      $name = (split(/::/, $name))[-1];
       return $c->match->stack->[-1]->{"${name}_id"} // '';
     }
   );
@@ -742,7 +747,7 @@ using this parameter.
   $r->collection('accounts', allows_optional_action => 1)
 
 If set, allow call to alternative methods inside collections so, as an example,
-accounts/foo/bar/1 calls method foo inside controller with bar=1 
+accounts/foo/bar/1 calls method foo inside controller with bar=1
 
 =back
 
