@@ -1,21 +1,21 @@
 package Mojolicious::Plugin::Restify;
 use Mojo::Base 'Mojolicious::Plugin';
- 
+
 use Mojo::Util qw(camelize);
- 
+
 our $VERSION = '0.08';
- 
+
 sub register {
   my ($self, $app, $conf) = @_;
- 
+
   $conf //= {};
- 
+
   # default HTTP method to instance method mappings for collections
   $conf->{collection_method_map} //= {
     get  => 'list',
     post => 'create',
   };
- 
+
   # default HTTP method to instance method mappings for resource elements
   $conf->{element_method_map} //= {
     delete => 'delete',
@@ -23,13 +23,13 @@ sub register {
     patch  => 'patch',
     put    => 'update',
   };
- 
+
   # over defaults to the standard route condition check (allow all)
   $conf->{over} //= 'standard';
- 
+
   # resource_lookup methods are added to element resource routes by default
   $conf->{resource_lookup} //= 1;
- 
+
   # When adding route conditions, warn developers if the exported conditions
   # already exist.
   if (exists $app->routes->conditions->{int}) {
@@ -43,19 +43,19 @@ sub register {
           = defined $pattern
           ? ($captures->{$pattern} // $captures->{int})
           : ($captures->{int} // '');
- 
+
         return 1 if $int =~ /^\d+$/;
       }
     );
   }
- 
+
   if (exists $app->routes->conditions->{standard}) {
     $app->log->debug("The standard route condition already exists, skipping");
   }
   else {
     $app->routes->add_condition(standard => sub {1});
   }
- 
+
   if (exists $app->routes->conditions->{uuid}) {
     $app->log->debug("The uuid route condition already exists, skipping");
   }
@@ -67,62 +67,62 @@ sub register {
           = defined $pattern
           ? ($captures->{$pattern} // $captures->{uuid})
           : ($captures->{uuid} // '');
- 
+
         return 1
           if $uuid
           =~ /^[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}$/i;
       }
     );
   }
- 
+
   $app->routes->add_shortcut(
     collection => sub {
       my $r       = shift;
       my $path    = shift;
       my $options = ref $_[0] eq 'HASH' ? shift : {@_};
- 
+
       $options->{element} //= 1;
       $options->{route_path} = $path;
       $path =~ tr/-/_/;
       $options->{route_name}
         = $options->{prefix} ? "$options->{prefix}_$path" : $path;
- 
+
       local $options->{collection_method_map} = $options->{collection_method_map}
         // $conf->{collection_method_map};
 
       # 'route' was deprecated in favor of 'any' in Mojolicious 8.67
       my $any_method = $r->can('route') ? 'route' : 'any';
- 
+
       # generate "/$path" collection route
       my $controller
         = $options->{controller} ? "$options->{controller}-$path" : $path;
       my $collection = $r->$any_method("/$options->{route_path}")->to("$controller#");
- 
+
       # Map HTTP methods to instance methods/mojo actions
       while (my ($http_method, $method) = each %{$options->{collection_method_map}}) {
         $collection->$http_method->to("#$method")
           ->name("$options->{route_name}_$method");
       }
- 
+
       return $options->{element}
         ? $collection->element($options->{route_path}, $options)
         : $collection;
     }
   );
- 
+
   $app->routes->add_shortcut(
     element => sub {
       my $r       = shift;
       my $path    = shift;
       my $options = ref $_[0] eq 'HASH' ? shift : {@_};
- 
+
       $options->{over}            //= $conf->{over};
       $options->{placeholder}     //= ':';
       $options->{resource_lookup} //= $conf->{resource_lookup};
       $path =~ tr/-/_/;
       $options->{route_name}
         = $options->{prefix} ? "$options->{prefix}_$path" : $path;
- 
+
       local $options->{element_method_map} = $options->{element_method_map}
         // $conf->{element_method_map};
 
@@ -130,12 +130,12 @@ sub register {
       # 'route' was deprecated in favor of 'any' in Mojolicious 8.67
       my $requires_method = $r->can('over') ? 'over' : 'requires';
       my $any_method = $r->can('route') ? 'route' : 'any';
- 
+
       # generate "/$path/:id" element route with specific placeholder
       my $element = $r->$any_method("/$options->{placeholder}${path}_id")
         ->$requires_method($options->{over} => "${path}_id")
         ->name($options->{route_name});
- 
+
       # Generate remaining CRUD routes for "/$path/:id", optionally creating a
       # resource_lookup method for the resource $element.
       #
@@ -147,17 +147,17 @@ sub register {
         ? $element->under->to('#resource_lookup')
         ->name("$options->{route_name}_resource_lookup")
         : $element;
- 
+
       # Map HTTP methods to instance methods/mojo actions
       while (my ($http_method, $method) = each %{$options->{element_method_map}}) {
         $under->$http_method->to("#$method")
           ->name("$options->{route_name}_$method");
       }
- 
+
       return $element;
     }
   );
- 
+
   $app->helper(
     'restify.current_id' => sub {
       my $c    = shift;
@@ -166,23 +166,23 @@ sub register {
       return $c->match->stack->[-1]->{"${name}_id"} // '';
     }
   );
- 
+
   $app->helper(
     'restify.routes' => sub {
       my ($self, $r, $routes, $defaults) = @_;
       return unless $routes;
- 
+
       # Allow users to simplify their route creation using an array ref!
       $routes = _arrayref_to_hashref($routes)
         if ref $routes && ref $routes eq 'ARRAY';
- 
+
       $defaults //= {};
       $defaults->{resource_lookup} //= $conf->{resource_lookup};
- 
+
       while (my ($name, $attrs) = each %$routes) {
         my $paths   = {};
         my $options = {%$defaults};
- 
+
         if (ref $attrs eq 'ARRAY') {
           $options = {%$options, %{$attrs->[-1]}} if ref $attrs->[-1] eq 'HASH';
           $paths = shift @$attrs if ref $attrs->[0] eq 'HASH';
@@ -190,7 +190,7 @@ sub register {
         elsif (ref $attrs eq 'HASH') {
           $paths = $attrs;
         }
- 
+
         if (scalar keys %$paths) {
           my $controller = $name;
           $controller =~ tr/-/_/;
@@ -218,17 +218,17 @@ sub register {
           $r->collection($name, $options);
         }
       }
- 
+
       return;
     }
   );
 }
- 
+
 # Aargh eurgh ma bwains!
 sub _arrayref_to_hashref {
   my $arrayref = shift;
   return {} unless defined $arrayref;
- 
+
   my $hashref = {};
   for my $path (@$arrayref) {
     my $options;
@@ -246,12 +246,12 @@ sub _arrayref_to_hashref {
         = {%{$hashref->{$key}}, %{_arrayref_to_hashref([join '/', @parts])}};
     }
   }
- 
+
   return $hashref;
 }
- 
+
 1;
- 
+
 =encoding utf8
 
 =head1 NAME
