@@ -90,13 +90,10 @@ sub register {
       local $options->{collection_method_map} = $options->{collection_method_map}
         // $conf->{collection_method_map};
 
-      # 'route' was deprecated in favor of 'any' in Mojolicious 8.67
-      my $any_method = $r->can('route') ? 'route' : 'any';
-
       # generate "/$path" collection route
       my $controller
         = $options->{controller} ? "$options->{controller}-$path" : $path;
-      my $collection = $r->$any_method("/$options->{route_path}")->to("$controller#");
+      my $collection = $r->any("/$options->{route_path}")->to("$controller#");
 
       # Map HTTP methods to instance methods/mojo actions
       while (my ($http_method, $method) = each %{$options->{collection_method_map}}) {
