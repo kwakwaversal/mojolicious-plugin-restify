@@ -126,10 +126,9 @@ sub register {
       # 'over' was deprecated in favor of 'requires' in Mojolicious 8.67
       # 'route' was deprecated in favor of 'any' in Mojolicious 8.67
       my $requires_method = $r->can('over') ? 'over' : 'requires';
-      my $any_method = $r->can('route') ? 'route' : 'any';
 
       # generate "/$path/:id" element route with specific placeholder
-      my $element = $r->$any_method("/$options->{placeholder}${path}_id")
+      my $element = $r->any("/$options->{placeholder}${path}_id")
         ->$requires_method($options->{over} => "${path}_id")
         ->name($options->{route_name});
 
