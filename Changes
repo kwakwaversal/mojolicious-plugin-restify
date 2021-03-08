@@ -1,5 +1,8 @@
 -----------------------------------------------------
 
+0.10  2021-03-08
+  - Version bump.
+
 0.09  2021-03-07
   - Update to accomodate deprecated functions in Mojolicious 9.*. (Thanks
     toratora.)
