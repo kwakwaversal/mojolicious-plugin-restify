@@ -103,13 +103,7 @@ sub register {
       }
       # allow call to alternative methods inside collections
       # $path/foo calls method foo inside controller
-      $collection->get("list/:action/*opt")->to(action => 'list',
-         opt => undef)->name("$options->{route_name}_actionopt" )
-         if ($options->{allows_optional_action});
-
-      # allow call to alternative methods inside collections
-      # $path/foo calls method foo inside controller
-      $collection->get("list/:action/*opt")->to(action => 'list',
+      $collection->get("list/:query/*opt")->to(action => 'list',
          opt => undef)->name("$options->{route_name}_actionopt" )
          if ($options->{allows_optional_action});
 
