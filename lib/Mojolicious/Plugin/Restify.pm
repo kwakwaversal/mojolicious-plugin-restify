@@ -93,6 +93,7 @@ sub register {
       # generate "/$path" collection route
       my $controller
         = $options->{controller} ? "$options->{controller}-$path" : $path;
+
       my $collection = $r->any("/$options->{route_path}")->to("$controller#");
 
       # Map HTTP methods to instance methods/mojo actions
@@ -100,6 +101,11 @@ sub register {
         $collection->$http_method->to("#$method")
           ->name("$options->{route_name}_$method");
       }
+      # allow call to alternative methods inside collections
+      # $path/foo calls method foo inside controller
+      $collection->get("list/:action/*opt")->to(action => 'list',
+         opt => undef)->name("$options->{route_name}_actionopt" )
+         if ($options->{allows_optional_action});
 
       # allow call to alternative methods inside collections
       # $path/foo calls method foo inside controller
@@ -133,8 +139,9 @@ sub register {
       my $requires_method = $r->can('over') ? 'over' : 'requires';
 
       # generate "/$path/:id" element route with specific placeholder
-      my $element = $r->any("/$options->{placeholder}${path}_id")
-        ->$requires_method($options->{over} => "${path}_id")->name($options->{route_name});
+      my $element = $r->route("/$options->{placeholder}${path}_id")
+      #my $element = $r->route("/$options->{placeholder}id")
+        ->over($options->{over} => "${path}_id")->name($options->{route_name} . '_id');
 
       # Generate remaining CRUD routes for "/$path/:id", optionally creating a
       # resource_lookup method for the resource $element.
@@ -148,9 +155,11 @@ sub register {
         ->name("$options->{route_name}_resource_lookup")
         : $element;
 
+
       # Map HTTP methods to instance methods/mojo actions
       while (my ($http_method, $method) = each %{$options->{element_method_map}}) {
-        $under->$http_method->to("#$method")
+        $under->$http_method->to(app => $options->{real_controller},
+            action => "$method")
           ->name("$options->{route_name}_$method");
       }
 
@@ -161,8 +170,9 @@ sub register {
   $app->helper(
     'restify.current_id' => sub {
       my $c    = shift;
-      my $name = $c->stash->{controller};
+      my $name = $c->stash->{app};
       $name =~ s,^.*\-,,;
+      $name = (split(/::/, $name))[-1];
       return $c->match->stack->[-1]->{"${name}_id"} // '';
     }
   );
@@ -725,6 +735,20 @@ I<action>.
 
 Enables or disables adding a C<resource_lookup> I<action> to the I<element> of
 the I<collection>.
+
+=item abs_controller
+
+  $r->collection('accounts', abs_controller => 1);
+
+If unset controller name is joined with app namespace. If set to 1 the
+controller name is related only to local paths
+
+=item ns
+
+  $r->collection('accounts', abs_controller => 1, ns => 'anotherNS');
+
+If C<abs_controller> is set, you can set an alternative namespace using
+using this parameter.
 
 =item allows_optional_action
 
