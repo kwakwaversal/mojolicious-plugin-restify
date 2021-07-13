@@ -93,7 +93,6 @@ sub register {
       # generate "/$path" collection route
       my $controller
         = $options->{controller} ? "$options->{controller}-$path" : $path;
-
       my $collection = $r->any("/$options->{route_path}")->to("$controller#");
 
       # Map HTTP methods to instance methods/mojo actions
@@ -133,9 +132,8 @@ sub register {
       my $requires_method = $r->can('over') ? 'over' : 'requires';
 
       # generate "/$path/:id" element route with specific placeholder
-      my $element = $r->route("/$options->{placeholder}${path}_id")
-      #my $element = $r->route("/$options->{placeholder}id")
-        ->over($options->{over} => "${path}_id")->name($options->{route_name} . '_id');
+      my $element = $r->any("/$options->{placeholder}${path}_id")
+        ->$requires_method($options->{over} => "${path}_id")->name($options->{route_name} . '_id');
 
       # Generate remaining CRUD routes for "/$path/:id", optionally creating a
       # resource_lookup method for the resource $element.
@@ -149,12 +147,10 @@ sub register {
         ->name("$options->{route_name}_resource_lookup")
         : $element;
 
-
       # Map HTTP methods to instance methods/mojo actions
       while (my ($http_method, $method) = each %{$options->{element_method_map}}) {
-        $under->$http_method->to(app => $options->{real_controller},
-            action => "$method")
-          ->name("$options->{route_name}_$method");
+        $under->$http_method->to("#$method")
+            ->name("$options->{route_name}_$method");
       }
 
       return $element;
