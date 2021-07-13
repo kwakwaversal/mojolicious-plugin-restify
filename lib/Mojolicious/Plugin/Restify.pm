@@ -170,7 +170,7 @@ sub register {
   $app->helper(
     'restify.current_id' => sub {
       my $c    = shift;
-      my $name = $c->stash->{app};
+      my $name = $c->stash->{app} || $c->stash->{controller};
       $name =~ s,^.*\-,,;
       $name = (split(/::/, $name))[-1];
       return $c->match->stack->[-1]->{"${name}_id"} // '';
@@ -735,20 +735,6 @@ I<action>.
 
 Enables or disables adding a C<resource_lookup> I<action> to the I<element> of
 the I<collection>.
-
-=item abs_controller
-
-  $r->collection('accounts', abs_controller => 1);
-
-If unset controller name is joined with app namespace. If set to 1 the
-controller name is related only to local paths
-
-=item ns
-
-  $r->collection('accounts', abs_controller => 1, ns => 'anotherNS');
-
-If C<abs_controller> is set, you can set an alternative namespace using
-using this parameter.
 
 =item allows_optional_action
 
