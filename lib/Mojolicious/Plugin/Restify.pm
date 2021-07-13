@@ -3,7 +3,7 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Util qw(camelize);
 
-our $VERSION = '0.08';
+our $VERSION = '0.10';
 
 sub register {
   my ($self, $app, $conf) = @_;
@@ -93,16 +93,20 @@ sub register {
       # generate "/$path" collection route
       my $controller
         = $options->{controller} ? "$options->{controller}-$path" : $path;
-      my $hashtag = $options->{abs_controller} ? '' : '#';
-      my $ns = $options->{abs_controller} && $options->{ns} ? $options->{ns} . '::' : '';
-      $options->{real_controller} = $ns . $controller;
-      my $collection = $r->route("/$options->{route_path}")->to("$ns$controller$hashtag");
+
+      my $collection = $r->any("/$options->{route_path}")->to("$controller#");
 
       # Map HTTP methods to instance methods/mojo actions
       while (my ($http_method, $method) = each %{$options->{collection_method_map}}) {
         $collection->$http_method->to("#$method")
           ->name("$options->{route_name}_$method");
       }
+      # allow call to alternative methods inside collections
+      # $path/foo calls method foo inside controller
+      $collection->get("list/:action/*opt")->to(action => 'list',
+         opt => undef)->name("$options->{route_name}_actionopt" )
+         if ($options->{allows_optional_action});
+
       # allow call to alternative methods inside collections
       # $path/foo calls method foo inside controller
       $collection->get("list/:action/*opt")->to(action => 'list',
@@ -130,6 +134,9 @@ sub register {
 
       local $options->{element_method_map} = $options->{element_method_map}
         // $conf->{element_method_map};
+
+      # 'over' was deprecated in favor of 'requires' in Mojolicious 8.67
+      my $requires_method = $r->can('over') ? 'over' : 'requires';
 
       # generate "/$path/:id" element route with specific placeholder
       my $element = $r->route("/$options->{placeholder}${path}_id")
@@ -570,6 +577,7 @@ L<Mojolicious::Plugin::Restify> implements the following route shortcuts.
   $r->collection('accounts', placeholder           => '*');
   $r->collection('accounts', prefix                => 'v1');
   $r->collection('accounts', resource_lookup       => '0');
+  $r->collection('accounts', allows_optional_action=> '0');
 
 A L<Mojolicious route shortcut|Mojolicious::Routes/shortcuts> which helps
 create the most common REST L<routes|Mojolicious::Routes::Route> for a
@@ -773,6 +781,8 @@ In alphabetical order:
 Castaway
 
 Dragoș-Robert Neagu
+
+Toratora
 
 =back
 

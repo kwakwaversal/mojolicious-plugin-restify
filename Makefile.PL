@@ -1,5 +1,7 @@
 use 5.010001;
 
+# https://www.perl.com/article/how-to-upload-a-script-to-cpan/
+
 use strict;
 use warnings;
 
