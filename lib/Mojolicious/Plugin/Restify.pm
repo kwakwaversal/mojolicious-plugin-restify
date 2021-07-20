@@ -128,7 +128,7 @@ sub register {
 
       # generate "/$path/:id" element route with specific placeholder
       my $element = $r->any("/$options->{placeholder}${path}_id")
-        ->$requires_method($options->{over} => "${path}_id")->name($options->{route_name});
+        ->$requires_method($options->{over} => "${path}_id")->name($options->{route_name} . '_id');
 
       # Generate remaining CRUD routes for "/$path/:id", optionally creating a
       # resource_lookup method for the resource $element.
