@@ -355,7 +355,7 @@ to the name of a route condition. See L<Mojolicious::Routes/conditions>.
   # /accounts         *         accounts
   #   +/              GET       "accounts_list"             Accounts::list
   #   +/              POST      "accounts_create"           Accounts::create
-  #   +/:accounts_id  *         "accounts"
+  #   +/:accounts_id  *         "accounts_id"
   #     +/            *         "accounts_resource_lookup"  Accounts::resource_lookup
   #       +/          DELETE    "accounts_delete"           Accounts::delete
   #       +/          GET       "accounts_read"             Accounts::read
